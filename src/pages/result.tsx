@@ -13,9 +13,11 @@ interface User {
     pronouns: "Ela/Dela" | "Ele/Dele" | "Eles/Delas";
     ethnicity: "Preta" | "Branca" | "Parda" | "Amarela" | "Indígena";
     city: string;
+    state: number;
     parties: number;
     games: "Sim" | "Não" | "Neutro";
     sports: "Sim" | "Não" | "Neutro";
+    interest: "Desenvolvimento de software" | "Inteligência artificial" | "Gestão de projetos" | "Segurança da informação" | "UX/UI Design";
 }
 
 export const ResultPage = () => {
@@ -37,7 +39,9 @@ export const ResultPage = () => {
             }
     
             const userData = userDoc.data() as User;
-    
+
+            const MAX_BIXOS_PER_VETERANO = 2;
+
             const matchQuery = query(
                 collection(db, "matches"),
                 where(userData.role === "bixo" ? "bixoId" : "veteranoId", "==", authCtx.user.uid)
@@ -61,11 +65,19 @@ export const ResultPage = () => {
             const allUsersSnapshot = await getDocs(collection(db, "users"));
             const allUsers: User[] = allUsersSnapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as User));
     
-            const usedVeteranIds = new Set(
-                (await getDocs(collection(db, "matches"))).docs.map(doc => doc.data().veteranoId)
-            );
+            const matchesSnapshot = await getDocs(collection(db, "matches"));
+            const usedVeteranIds = new Map<string, number>();
     
-            const potentialMatches = allUsers.filter(u => u.role === "veterano" && !usedVeteranIds.has(u.id));
+            matchesSnapshot.docs.forEach(doc => {
+                const data = doc.data();
+                if (usedVeteranIds.has(data.veteranoId)) {
+                    usedVeteranIds.set(data.veteranoId, usedVeteranIds.get(data.veteranoId)! + 1);
+                } else {
+                    usedVeteranIds.set(data.veteranoId, 1);
+                }
+            });
+    
+            const potentialMatches = allUsers.filter(u => u.role === "veterano" && (usedVeteranIds.get(u.id) || 0) < MAX_BIXOS_PER_VETERANO);
     
             let bestMatch: User | null = null;
             let bestScore = -1;
@@ -73,11 +85,13 @@ export const ResultPage = () => {
             for (const potential of potentialMatches) {
                 let score = 0;
                 if (potential.city === userData.city) score += 2;
+                if (potential.state === userData.state) score += 1;
                 if (potential.pronouns === userData.pronouns) score += 1;
                 if (potential.ethnicity === userData.ethnicity) score += 1;
                 if (potential.parties === userData.parties) score += 2;
-                if (potential.games === userData.games) score += 1;
+                if (potential.games === userData.games) score += 2;
                 if (potential.sports === userData.sports) score += 1;
+                if (potential.interest === userData.interest) score += 1;
     
                 if (score > bestScore) {
                     bestScore = score;
@@ -116,7 +130,7 @@ export const ResultPage = () => {
                 {authCtx?.role === 'bixo' ? 'Você foi apadrinhado por:' : 'Você apadrinhou:'}
             </h1>
             <p className="text-white text-2xl font-semibold">
-                {match ? match.name : "Nenhum match disponível no momento :("}
+                {match ? match.name : "Nenhum match disponível no momento, volte mais tarde!"}
             </p>
             {match && (
                 <p className="text-white text-xl">

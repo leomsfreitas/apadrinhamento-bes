@@ -50,6 +50,10 @@ const formSchema = z.object({
   sports: z.enum(["Sim", "Não", "Neutro"], { 
     required_error: "Selecione uma opção para esportes",
     invalid_type_error: "Selecione uma opção para esportes"
+  }),
+  interest: z.enum(["Desenvolvimento de software", "Inteligência artificial", "Gestão de projetos", "Segurança da informação", "UX/UI Design"], {
+    required_error: "Selecione uma área de interesse",
+    invalid_type_error: "Selecione uma área de interesse"
   })
 });
 
@@ -381,6 +385,24 @@ export const SignupPage = () => {
         </div>
         {errors.sports && (
           <span className="text-red-400">{errors.sports.message}</span>
+        )}
+
+        <p>Qual área da engenharia de software mais te interessa?</p>
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-2 justify-evenly items-center">
+          {["Desenvolvimento de software", "Inteligência artificial", "Gestão de projetos", "Segurança da informação", "UX/UI Design"].map((interest) => (
+            <label key={interest} className="flex justify-center items-center gap-2 text-lg">
+              <input
+                className="cursor-pointer w-5 h-5 rounded-full not-checked:bg-white checked:bg-purple-900 border-2 border-gray-400 checked:border-purple-900 checked:accent-purple-900"
+                type="radio"
+                value={interest}
+                {...register("interest")}
+              />
+              {interest}
+            </label>
+          ))}
+        </div>
+        {errors.interest && (
+          <span className="text-red-400">{errors.interest.message}</span>
         )}
 
         <button
