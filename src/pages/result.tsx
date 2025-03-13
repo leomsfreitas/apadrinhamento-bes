@@ -23,7 +23,8 @@ interface User {
 export const ResultPage = () => {
     const authCtx = useAuth();
     const navigate = useNavigate();
-    const [match, setMatch] = useState<User | null>(null);
+    const [matches, setMatches] = useState<User[]>([]);
+
     useEffect(() => {
         const checkAuthAndFetch = async () => {
             await authCtx.verify();
@@ -50,20 +51,20 @@ export const ResultPage = () => {
             const matchSnapshot = await getDocs(matchQuery);
     
             if (!matchSnapshot.empty) {
-                const matchData = matchSnapshot.docs[0].data();
-                const matchedUserId = userData.role === "bixo" ? matchData.veteranoId : matchData.bixoId;
-                const matchedUserDoc = await getDoc(doc(db, "users", matchedUserId));
-    
-                if (matchedUserDoc.exists()) {
-                    setMatch(matchedUserDoc.data() as User);
-                }
+                const matchDataList = await Promise.all(matchSnapshot.docs.map(async (matchDoc) => {
+                    const matchData = matchDoc.data();
+                    const matchedUserId = userData.role === "bixo" ? matchData.veteranoId : matchData.bixoId;
+                    const matchedUserDoc = await getDoc(doc(db, "users", matchedUserId));
+                    return matchedUserDoc.exists() ? matchedUserDoc.data() as User : null;
+                }));
+                setMatches(matchDataList.filter(Boolean) as User[]);
                 return;
             }
     
             if (userData.role === "veterano") return;
     
             const allUsersSnapshot = await getDocs(collection(db, "users"));
-            const allUsers: User[] = allUsersSnapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as User));
+            const allUsers: User[] = allUsersSnapshot.docs.map(userDoc => ({ id: userDoc.id, ...userDoc.data() } as User));
     
             const matchesSnapshot = await getDocs(collection(db, "matches"));
             const usedVeteranIds = new Map<string, number>();
@@ -103,10 +104,9 @@ export const ResultPage = () => {
                 await setDoc(doc(collection(db, "matches")), {
                     bixoId: authCtx.user.uid,
                     veteranoId: bestMatch.id,
-                    timestamp: new Date(),
                 });
     
-                setMatch(bestMatch);
+                setMatches([bestMatch]);
             }
         };
     
@@ -129,13 +129,15 @@ export const ResultPage = () => {
             <h1 className="mt-8 text-4xl text-center font-extrabold text-orange-500">
                 {authCtx?.role === 'bixo' ? 'Você foi apadrinhado por:' : 'Você apadrinhou:'}
             </h1>
-            <p className="text-white text-2xl font-semibold">
-                {match ? match.name : "Nenhum match disponível no momento, volte mais tarde!"}
-            </p>
-            {match && (
-                <p className="text-white text-xl">
-                    Telefone: {match.phone}
-                </p>
+            {matches.length > 0 ? (
+                matches.map((match) => (
+                    <div key={match.id} className="text-center">
+                        <p className="text-white text-2xl font-semibold">{match.name}</p>
+                        <p className="text-white text-xl">Telefone: {match.phone}</p>
+                    </div>
+                ))
+            ) : (
+                <p className="text-white text-2xl font-semibold">Nenhum match disponível no momento, volte mais tarde!</p>
             )}
             <button className="mt-8 bg-amber-600 text-white text-xl py-2 px-4 rounded-lg cursor-pointer" onClick={() => authCtx.logout()}>Sair</button>
         </div>
